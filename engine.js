@@ -1,5 +1,4 @@
 
-
 /* To continue with this project, the following will need to be done:
 
 	1. Go to the Physics class and fix the issue by the comment "Error here"
@@ -7,7 +6,6 @@
 	3. Introduce inertia, that is the ball will have angular acceleration
 
 */
-
 
 class Shape extends Path2D {
 	
@@ -98,8 +96,87 @@ class Circle extends Shape {
 		this.target;
 	}
 
-	onRectHit(node, target) { 
+	getTranslatedPositionsAndVelocities(node, target) {
 		let r = this.radius;
+		let x = node.xPos+r;
+		let y = node.yPos+r;
+		let speed = Math.hypot(node.physicsBody.velocityY, node.physicsBody.velocityX);
+		let a = Math.atan2(node.physicsBody.velocityY, node.physicsBody.velocityX) - target.theta;
+		
+		let p = this.translateCentre(node, target);
+		let newX = p[0];
+		let newY = p[1];
+		let vX = speed*Math.cos(a);
+		let vY = speed*Math.sin(a);
+		return [newX, newY, vX, vY]; 
+	}
+
+	getPointOfCollisionForCircleAroundCorner(node, target, corner) {
+
+		if (node.physicsBody.velocityX == 0 && node.physicsBody.velocityY == 0) {
+			return [NaN, NaN];
+		}
+		let r = this.radius;
+		let translatedPositionsAndVelocities = this.getTranslatedPositionsAndVelocities(node, target);
+		
+		let velocityY = translatedPositionsAndVelocities[3];
+		let velocityX = translatedPositionsAndVelocities[2];
+
+		// target properties
+		let tX = corner[0];
+		let tY = corner[1];
+
+		// node properties
+		let cX = translatedPositionsAndVelocities[0]-tX;
+		let cY = translatedPositionsAndVelocities[1]-tY;
+		let vX = velocityX;
+		let vY = velocityY;
+		let dir = Math.atan2(vY, vX);
+
+		// Wolfram's algorithm
+
+		// Points in between for which a line may intersect a circle 
+		let x1 = cX;
+		let y1 = cY;
+
+		let x2 = cX + 1000*Math.cos(dir);
+		let y2 = cY + 1000*Math.sin(dir);
+
+		let dx = x2 - x1;
+		let dy = y2 - y1;
+		let dr = Math.hypot(dx, dy); 
+		let D = x1*y2 - x2*y1;
+		let discriminant = Math.round((r*r*dr*dr) - (D*D));
+
+		// Collision point
+		let x = (D*dy - dx * Math.sqrt(discriminant)) / (dr*dr) + tX;
+		let y = (-D*dx - dy*Math.sqrt(discriminant)) / (dr*dr) + tY;
+
+		let radius = Math.hypot(x-(target.xPos+target.shape.width/2), y-(target.yPos+target.shape.height/2));
+		let theta = Math.atan2((y-(target.yPos+target.shape.height/2)),(x-(target.xPos+target.shape.width/2))) + target.theta;
+	
+		// Translate back
+		x = target.xPos+target.shape.width/2 + radius * Math.cos(theta);
+		y = target.yPos+target.shape.height/2 + radius * Math.sin(theta);
+
+		// Check if direction of the circle is towards the point
+		let sine = node.yPos+r - y;
+		sine = (sine < 1 && sine > 0) || (sine > -1 && sine < 0) ? Math.abs(Math.round(sine)) : sine;
+		let cos = node.xPos+r - x;
+		cos = cos < 1 && cos > 0 ? Math.round(cos) : cos;
+
+		let angleOfPointRelativeToCircle = Math.atan2(sine, cos);
+		let a = Math.atan2(node.physicsBody.velocityY, node.physicsBody.velocityX);
+
+		if (((angleOfPointRelativeToCircle > 0 && a > 0) || (angleOfPointRelativeToCircle < 0 && a < 0) || (angleOfPointRelativeToCircle == a))) {
+			return [NaN, NaN];
+		}
+
+		return [x, y];
+
+	}		
+
+	getXAndYDistanceToRectFromCentre(node, target) {
 		let Circle = this.translateCentre(node, target);
 		let CircleX = Circle[0];
 		let CircleY = Circle[1];
@@ -109,6 +186,14 @@ class Circle extends Shape {
 		let RectHeight = target.shape.height;
 		let DeltaX = CircleX - Math.max(RectX, Math.min(CircleX, RectX + RectWidth));
 		let DeltaY = CircleY - Math.max(RectY, Math.min(CircleY, RectY + RectHeight));
+		return [DeltaX, DeltaY];
+	}
+
+	onRectHit(node, target) { 
+		let r = this.radius;
+		let Delta = this.getXAndYDistanceToRectFromCentre(node, target);
+		let DeltaX = Delta[0];
+		let DeltaY = Delta[1];
 		return (DeltaX * DeltaX + DeltaY * DeltaY) <= (r * r);
 	}
 
@@ -482,6 +567,7 @@ class PhysicsBody {
 		this.angularVelocity = 0;
 		this.mass = mass;
 		this.alpha = 0; 
+		this.isTouching2 = false;
 	}
 
 	setGravity(gravity) {
@@ -507,20 +593,249 @@ class PhysicsBody {
 		this.node.changeXBy(this.node.shape.radius * (theta + alpha));
 	}
 
+	getClosestOfThePoints(collidingCorners, target) {
+		if (collidingCorners.length == 0) {
+			return NaN;
+		}
+		var closestDistances = [];
+		var original = [];
+		let tP = this.physicsMask.translateCentre(this.node, target);
+		for (var i = 0; i < collidingCorners.length; i++) {
+			let value = Math.hypot(tP[0]-collidingCorners[i][0], tP[1]-collidingCorners[i][1]);
+			closestDistances.push(value);
+			original.push(value);
+		}
+		let closestDistance = closestDistances.sort(function(a,b){return a - b})[0];
+		let index = original.indexOf(closestDistance); 
+		return collidingCorners[index];
+	}
+
+	getClosestCollidingCorner(target) {
+		let corners = [[target.xPos, target.yPos], [target.xPos, target.yPos+target.shape.height], [target.xPos+target.shape.width, target.yPos+target.shape.height], [target.xPos+target.shape.width, target.yPos]];
+		var collidingCorners = [];
+		for (var i = 0; i < corners.length; i++) {
+			if (this.physicsMask.getPointOfCollisionForCircleAroundCorner(this.node, target, corners[i])[0]) {
+				collidingCorners.push(corners[i]);
+			}  
+		}
+		return this.getClosestOfThePoints(collidingCorners, target);
+	}
+
+	isWithInBoundaries(p, corner1, corner2, isHorizontal) {
+		if (isHorizontal) {
+			return ((corner1[0] <= p[0]) && (corner2[0] >= p[0])) || ((corner1[0] >= p[0]) && (corner2[0] <= p[0]));
+		} 
+		return ((corner1[1] <= p[1]) && (corner2[1] >= p[1])) || ((corner1[1] >= p[1]) && (corner2[1] <= p[1]));
+	}
+
+	pointIsNotBehind(p, vX, vY, centreX, centreY) {
+		let dir1 = Math.round(Math.atan2(-(centreY) + p[1], -(centreX) + p[0]));
+		let dir2 = Math.round(Math.atan2(vY, vX));
+		return dir1 == dir2;
+	}
+
+	getPointOfIntersectionBetweenCorners(target, corner1, corner2) {
+		let isHorizontal = corner1[1] == corner2[1];
+		let r = this.physicsMask.radius;
+		let translation = this.physicsMask.getTranslatedPositionsAndVelocities(this.node, target);
+		let centreX = translation[0];
+		let centreY = translation[1];
+		let vX = translation[2];
+		let vY = translation[3];
+		let dir = Math.atan2(vY, vX);
+		let b = centreY - Math.tan(dir)*centreX;
+		if (isHorizontal) {
+			let x = (corner1[1] - b)/Math.tan(dir);
+			let dX = (r * 1/Math.tan(dir))*(corner1[1] > centreY ? -1 : 1);
+			let p = [x+dX, corner1[1]+r*(corner1[1] > centreY ? -1 : 1)]; 
+			return this.isWithInBoundaries(p, corner1, corner2, isHorizontal) && this.pointIsNotBehind(p, vX, vY, centreX, centreY) ? p : NaN;
+		} else { 
+			let y = Math.tan(dir)*corner1[0] + b;
+			let dY = (r * Math.tan(dir))*(corner1[0] > centreX ? -1 : 1);
+			let p = [corner1[0]+r*(corner1[0] > centreX ? -1 : 1), y+dY];
+			return this.isWithInBoundaries(p, corner1, corner2, isHorizontal) && this.pointIsNotBehind(p, vX, vY, centreX, centreY) ? p : NaN;
+		}
+		return NaN;
+	}
+
+	getAllIntersectingEdges(target) {
+		let corners = [[target.xPos, target.yPos], [target.xPos, target.yPos+target.shape.height], [target.xPos+target.shape.width, target.yPos+target.shape.height], [target.xPos+target.shape.width, target.yPos]];
+		var intersectingEdges = [];
+		for (let i = 0; i < corners.length; i++) {
+			let p = this.getPointOfIntersectionBetweenCorners(target, corners[i], corners[(i+1)%corners.length]);
+			if (p) {
+				intersectingEdges.push(p);
+			}
+		}	
+		return intersectingEdges;
+	}
+
+	getPointOnEdge(target) {
+		let intersectingEdges = this.getAllIntersectingEdges(target);
+		if (intersectingEdges.length > 0) {
+			let result = this.getClosestOfThePoints(intersectingEdges, target);
+			return result;
+		}
+		return NaN;
+	}
+
+	translateBack(point, target) {
+		if (!point) {
+			return NaN;
+		}
+		let r = this.physicsMask.radius;
+		let x = point[0]; 
+		let y = point[1];
+		let radius = Math.hypot(x-(target.xPos+target.shape.width/2), y-(target.yPos+target.shape.height/2));
+		let theta = Math.atan2((y-(target.yPos+target.shape.height/2)),(x-(target.xPos+target.shape.width/2))) + target.theta;
+		x = (target.xPos+(target.shape.width/2) + radius * Math.cos(theta));
+		y = (target.yPos+(target.shape.height/2) + radius * Math.sin(theta));
+		return [x, y];
+	}
+
+	centreDistanceToPoint(point) {
+		return Math.hypot(this.node.xPos+this.physicsMask.radius - point[0], this.node.yPos+this.physicsMask.radius - point[1]);
+	}
+
+	cornerIsCloser(points, hittingEdge) {
+		if (hittingEdge && points.length > 1) {
+			return this.centreDistanceToPoint(points[0]) > this.centreDistanceToPoint(points[1]);
+		} 
+		if (!hittingEdge && points.length == 1) {
+			return true;
+		}
+		return false;
+	}
+
+	isAtOneOfTheEdges(corners, r, target) {
+		let centre = this.physicsMask.translateCentre(this.node, target);
+		let centreX = centre[0];
+		let centreY = centre[1];
+		let edge1 = [corners[0], corners[1]];
+		let edge2 = [corners[1], corners[2]];
+		let edge3 = [corners[2], corners[3]];
+		let edge4 = [corners[3], corners[0]];
+		let edges = [edge1, edge2, edge3, edge4];
+
+		for (var i = 0; i < edges.length; i++) {
+			if (edges[i][0][1] == edges[i][1][1]) {
+				// Horizontal
+				if (Math.round(centreY) == (edges[i][0][1] == target.yPos ? edges[i][0][1]-r : edges[i][0][1]+r)) {
+					if (centreX >= edge1[0][0] && centreX <= edge1[1][0]) {
+						return true;
+					}
+					if (centreX <= edge3[0][0] && centreX >= edge3[1][0]) {
+						return true;
+					}
+				}
+			} else {
+				// Vertical
+				if (Math.round(centreX) == target.xPos-r || Math.round(centreX) == target.xPos+target.shape.width+r) {
+					if (centreY <= edge2[0][1] && centreY >= edge2[1][1]) {
+						return true;
+					}
+					if (centreY >= edge4[0][1] && centreY <= edge4[1][1]) {
+						return true;
+					}
+				}
+			}
+		}
+
+		return false;
+	}
+
+	isAtOneOfTheCorners(corners, r, target) {
+		let centre = this.physicsMask.translateCentre(this.node, target);
+		let centreX = centre[0];
+		let centreY = centre[1];
+		for (var i = 0; i < corners.length; i++) {
+			let corner = corners[i];
+			if (Math.round(Math.hypot(centreX-corner[0], centreY-corner[1])) == r) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	centreAlreadyAtCollisionPoint(r, target) {
+		let w = target.shape.width;
+		let h = target.shape.height;		
+		let corners = [[target.xPos, target.yPos+h], [target.xPos+w, target.yPos+h], [target.xPos+w, target.yPos], [target.xPos, target.yPos]];
+		let isAtACorner = this.isAtOneOfTheCorners(corners, r, target);
+		let isAtAnEdge = this.isAtOneOfTheEdges(corners, r, target);
+		return isAtAnEdge || isAtACorner;
+	}
+
+	getPointOfCollision(r, target) {
+		if (this.velocityX == 0 && this.velocityY == 0) {
+			return NaN;
+		}
+		let pointOnEdge = this.translateBack(this.getPointOnEdge(target), target);
+		var points = [];
+		let hittingEdge = false;
+		if (pointOnEdge) {
+			points.push(pointOnEdge);
+			hittingEdge = true;
+		}
+		let corner = this.getClosestCollidingCorner(target);
+		if (corner) {
+			points.push(this.physicsMask.getPointOfCollisionForCircleAroundCorner(this.node, target, corner));
+		}
+		if (this.cornerIsCloser(points, hittingEdge) && points.length > 0) {
+			return points.length > 1 ? points[1] : points[0];
+		} else if (hittingEdge) {
+			return points[0];
+		}
+		return NaN;
+	}
+
+
+	applyGravitation() {
+		this.changeYVelocityBy(this.gravity);
+	}
 
 
 	
 
-
+	passedPointOfCollision(prevP, curtP, pointOfCollision) {
+		let dY1 = prevP[1] - pointOfCollision[1];
+		let dY2 = curtP[1] - pointOfCollision[1];
+		let dX1 = prevP[0] - pointOfCollision[0];
+		let dX2 = curtP[0] - pointOfCollision[0];
+		return dY1 == -dY2 && dX1 == -dX2;
+	}
 
 
 
 
 
 	simulateCircle(r, target) {
-		console.log(this.physicsMask.isHit(this.node, this.node.parent));
-		this.move();
+		let isTouching = this.centreAlreadyAtCollisionPoint(r, target);
+		let pointOfCollision = this.getPointOfCollision(r, target);
+		let prevP = [this.node.xPos+r, this.node.yPos+r];
+		if (!isTouching) {
+			this.move();
+			let curtP = [this.node.xPos+r, this.node.yPos+r];
+			if (this.passedPointOfCollision(prevP, curtP, pointOfCollision)) {
+				this.node.setX(pointOfCollision[0] - r);
+				this.node.setY(pointOfCollision[1] - r);
+			}	
+		} 
+		//console.log(pointOfCollision);
+		//console.log(isTouching);
 	}
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -676,5 +991,6 @@ function renderNode(parent, ctx) {
 	parent.isRotating = false;
 
 }
+
 
 
