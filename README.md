@@ -1,4 +1,6 @@
 # GameEngineJS
+by Marko Rankovic 
+
 
 This is a Javascript game engine currently intended for educational purposes only.
 
@@ -10,4 +12,3 @@ Rotation - Rotate SpriteNodes about their centre.
 
 Physics - Gravity, collision detection and angular velocity
 
-by Marko Rankovic 
