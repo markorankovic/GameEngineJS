@@ -1,5 +1,4 @@
 
-
 /* To continue with this project, the following will need to be done:
 
 	1. Go to the Physics class and fix the issue by the comment "Error here"
@@ -7,7 +6,6 @@
 	3. Introduce inertia, that is the ball will have angular acceleration
 
 */
-
 
 class Shape extends Path2D {
 	
@@ -178,73 +176,25 @@ class Circle extends Shape {
 
 	}		
 
-	collisionWithCorner(node, target, centreX, centreY) {
-		let nodeXCenter = centreX;
-		let nodeYCenter = centreY;
-
-		let p1 = [target.xPos, target.yPos + target.shape.height];  
-		let p2 = [target.xPos + target.shape.width, target.yPos + target.shape.height];  
-		let p3 = [target.xPos + target.shape.width, target.yPos + target.shape.height];  
-		let p4 = [target.xPos + target.shape.width, target.yPos];  
-		let p5 = [target.xPos + target.shape.width, target.yPos];  
-		let p6 = [target.xPos, target.yPos];  
-		let p7 = [target.xPos, target.yPos];  
-		let p8 = [target.xPos, target.yPos + target.shape.height];  
-
-		let c1 = [target.xPos, target.yPos + target.shape.height];
-		let c2 = [target.xPos + target.shape.width, target.yPos + target.shape.height];
-		let c3 = [target.xPos + target.shape.width, target.yPos];
-		let c4 = [target.xPos, target.yPos];
-
-		let withInP1AndP2 = ((nodeXCenter) >= p1[0] && (nodeXCenter) <= p2[0]) && ((nodeYCenter-this.radius) <= p1[1]);
-		let withInP3AndP4 = (nodeXCenter-this.radius) <= p3[0] && ((nodeYCenter) <= p3[1]) && ((nodeYCenter) >= p4[1]);
-		let withInP5AndP6 = (nodeYCenter+this.radius) >= p6[1] && ((nodeXCenter) >= p6[0]) && ((nodeXCenter) <= p5[0]);
-		let withInP7AndP8 = (nodeXCenter+this.radius) >= p7[0] && ((nodeYCenter) <= p8[1]) && ((nodeYCenter) >= p7[1]);
-
-		if ((withInP1AndP2 && withInP5AndP6) || (withInP3AndP4 && withInP7AndP8)) {
-			return true;
-		}
-
- 		let corners = [c1, c2, c3, c4];
-
-	for (let i = 0; i < corners.length; i++) {
-		let distance = Math.hypot(nodeXCenter - corners[i][0], nodeYCenter - corners[i][1]);
-		// Check c1
-		if (i == 0) {
-		if ((distance < this.radius) && nodeXCenter <= target.xPos && nodeXCenter >= target.xPos-this.radius && nodeYCenter >= target.yPos+target.shape.height) {
-			return true;
-		}
-		}
-		if (i == 1) {
-		// Check c2
-		if ((distance < this.radius) && nodeXCenter <= target.xPos+target.shape.width+this.radius && nodeXCenter >= target.xPos+target.shape.width && nodeYCenter >= target.yPos+target.shape.height) {
-			return true;
-		}
-		}
-		if (i == 2) {
-		// Check c3
-		if ((distance < this.radius) && nodeXCenter >= target.xPos+target.shape.width && nodeXCenter <= target.xPos+target.shape.width+this.radius && nodeYCenter <= target.yPos && nodeYCenter >= target.yPos-this.radius) {
-			return true;
-		}
-		}
-		if (i == 3) {
-		// Check c4
-		if ((distance < this.radius) && nodeXCenter <= target.xPos && nodeXCenter >= target.xPos-this.radius && nodeYCenter <= target.yPos && nodeYCenter >= target.yPos-this.radius) {
-			return true;
-		}
-		}
+	getXAndYDistanceToRectFromCentre(node, target) {
+		let Circle = this.translateCentre(node, target);
+		let CircleX = Circle[0];
+		let CircleY = Circle[1];
+		let RectX = target.xPos;
+		let RectY = target.yPos;
+		let RectWidth = target.shape.width;
+		let RectHeight = target.shape.height;
+		let DeltaX = CircleX - Math.max(RectX, Math.min(CircleX, RectX + RectWidth));
+		let DeltaY = CircleY - Math.max(RectY, Math.min(CircleY, RectY + RectHeight));
+		return [DeltaX, DeltaY];
 	}
-		return false;
-
-	}
-
 
 	onRectHit(node, target) { 
-		let cPoint = target.shape.translateCentre(node, target);
-		if (this.collisionWithCorner(node, target, Math.round(cPoint[0]), Math.round(cPoint[1]))) {
-			return true;
-		}
-		return false;
+		let r = this.radius;
+		let Delta = this.getXAndYDistanceToRectFromCentre(node, target);
+		let DeltaX = Delta[0];
+		let DeltaY = Delta[1];
+		return (DeltaX * DeltaX + DeltaY * DeltaY) <= (r * r);
 	}
 
 	onCircHit(node, target) {
@@ -585,7 +535,7 @@ class Scene extends SpriteNode {
 
 		var rect3_1 = new SpriteNode(400, 340, 0, 'rect3_1');
 		rect3_1.setShape(new Rect(400, 100, 3, 'green', 'black'));
-		rect3_1.rotateBy(1);
+		//rect3_1.rotateBy(1);
 
 		this.addChild(rect3_1);
 		this.addChild(rect3);
@@ -845,78 +795,34 @@ class PhysicsBody {
 	}
 
 
-	notMoving() {
-		return this.velocityX == 0 && this.velocityY == 0;
+	
+
+	passedPointOfCollision(prevP, curtP, pointOfCollision) {
+		let dY1 = prevP[1] - pointOfCollision[1];
+		let dY2 = curtP[1] - pointOfCollision[1];
+		let dX1 = prevP[0] - pointOfCollision[0];
+		let dX2 = curtP[0] - pointOfCollision[0];
+		return dY1 == -dY2 && dX1 == -dX2;
 	}
 
-
-	getPointsOfCollisionBetweenVelocity(r, target) {
-		this.node.changeXBy(-this.velocityX);
-		this.node.changeYBy(-this.velocityY);
-
-		let currentPointOfCollision = this.getPointOfCollision(r, target);
-
-		this.node.changeXBy(this.velocityX);
-		this.node.changeYBy(this.velocityY);
-
-		let nextPointOfCollision = this.getPointOfCollision(r, target); 
-		return [currentPointOfCollision, nextPointOfCollision];
-	}
-
-
-	currentAndNextPointOfCollisionAreTheSame(r, target) {
-
-		if (this.notMoving()) {
-			return true;
-		}
-
-		let pointsOfCollisionBetweenVelocity = this.getPointsOfCollisionBetweenVelocity(r, target);
-		let currentPointOfCollision = pointsOfCollisionBetweenVelocity[0];
-		let nextPointOfCollision = pointsOfCollisionBetweenVelocity[1];
-
-		if (!currentPointOfCollision) {
-			return true;
-		}
-
-		let xPointsTheSame = Math.round(currentPointOfCollision[0]) == Math.round(nextPointOfCollision[0]);
-		let yPointsTheSame = Math.round(currentPointOfCollision[1]) == Math.round(nextPointOfCollision[1]);
-
-		return xPointsTheSame && yPointsTheSame;
-	}
-
-
-	circleIsHit(r, target) {
-
-		if (!this.currentAndNextPointOfCollisionAreTheSame(r, target)) {
-			return true;
-		}
-		return false;
-
-	}
-
-
-	bounce() {
-		this.velocityX = -this.velocityX;
-		this.velocityY = -this.velocityY;
-	}
-
-	handleCollision(r, target) {
-		let circleIsHit = this.circleIsHit(r, target);
-		if (circleIsHit) {
-			console.log("circleIsHit");
-			this.node.changeXBy(-this.velocityX);
-			this.node.changeYBy(-this.velocityY);
-			this.bounce();
-		}
-	}
 
 
 
 
 	simulateCircle(r, target) {
-		this.applyGravitation();
-		this.move();
-		this.handleCollision(r, target);
+		let isTouching = this.centreAlreadyAtCollisionPoint(r, target);
+		let pointOfCollision = this.getPointOfCollision(r, target);
+		let prevP = [this.node.xPos+r, this.node.yPos+r];
+		if (!isTouching) {
+			this.move();
+			let curtP = [this.node.xPos+r, this.node.yPos+r];
+			if (this.passedPointOfCollision(prevP, curtP, pointOfCollision)) {
+				this.node.setX(pointOfCollision[0] - r);
+				this.node.setY(pointOfCollision[1] - r);
+			}	
+		} 
+		//console.log(pointOfCollision);
+		//console.log(isTouching);
 	}
 
 
@@ -1085,5 +991,6 @@ function renderNode(parent, ctx) {
 	parent.isRotating = false;
 
 }
+
 
 
