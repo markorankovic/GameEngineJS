@@ -98,8 +98,7 @@ class Circle extends Shape {
 		this.target;
 	}
 
-	onRectHit(node, target) { 
-		let r = this.radius;
+	getXAndYDistanceToRectFromCentre(r, node, target) {
 		let Circle = this.translateCentre(node, target);
 		let CircleX = Circle[0];
 		let CircleY = Circle[1];
@@ -109,6 +108,14 @@ class Circle extends Shape {
 		let RectHeight = target.shape.height;
 		let DeltaX = CircleX - Math.max(RectX, Math.min(CircleX, RectX + RectWidth));
 		let DeltaY = CircleY - Math.max(RectY, Math.min(CircleY, RectY + RectHeight));
+		return [DeltaX, DeltaY];
+	}
+
+	onRectHit(node, target) { 
+		let r = this.radius;
+		let Delta = this.getXAndYDistanceToRectFromCentre(r, node, target);
+		let DeltaX = Delta[0];
+		let DeltaY = Delta[1];
 		return (DeltaX * DeltaX + DeltaY * DeltaY) <= (r * r);
 	}
 
@@ -513,12 +520,7 @@ class PhysicsBody {
 
 
 
-
-
-
-
 	simulateCircle(r, target) {
-		console.log(this.physicsMask.isHit(this.node, this.node.parent));
 		this.move();
 	}
 
