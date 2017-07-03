@@ -529,13 +529,17 @@ class Scene extends SpriteNode {
 	constructor () {
 		super(0, 0, 0, 'scene');
 
+		let rect4 = new SpriteNode(25, 25, 0, 'rect4');
+		rect4.setShape(new Rect(20, 20, 3, 'blue', 'black'));
+
 		var rect3 = new SpriteNode(sP()[0], sP()[1], 0, 'rect3');
 		rect3.setShape(new Circle(50, 3, 'red', 'black'));
 		rect3.physicsBody = new PhysicsBody(rect3, 2);
+		rect3.addChild(rect4);
 
-		var rect3_1 = new SpriteNode(400, 340, 0, 'rect3_1');
-		rect3_1.setShape(new Rect(400, 100, 3, 'green', 'black'));
-		//rect3_1.rotateBy(1);
+		var rect3_1 = new SpriteNode(400, 450, 0, 'rect3_1');
+		rect3_1.setShape(new Rect(400, 200, 3, 'green', 'black'));
+		rect3_1.rotateBy(1);
 
 		this.addChild(rect3_1);
 		this.addChild(rect3);
@@ -551,7 +555,7 @@ class Player extends SpriteNode {
 }
 
 function sP() {
-	return [480, 20];
+	return [635, 50];
 }
 
 class PhysicsBody {
@@ -590,7 +594,7 @@ class PhysicsBody {
 	rotateBy(theta, alpha) {
 		this.alpha += alpha; 
 		this.node.rotateBy(theta + alpha);
-		this.node.changeXBy(this.node.shape.radius * (theta + alpha));
+		this.node.changeXVelocityBy(this.node.shape.radius * (theta + alpha));
 	}
 
 	getClosestOfThePoints(collidingCorners, target) {
@@ -795,34 +799,38 @@ class PhysicsBody {
 	}
 
 
-	
-
-	passedPointOfCollision(prevP, curtP, pointOfCollision) {
-		let dY1 = prevP[1] - pointOfCollision[1];
-		let dY2 = curtP[1] - pointOfCollision[1];
-		let dX1 = prevP[0] - pointOfCollision[0];
-		let dX2 = curtP[0] - pointOfCollision[0];
-		return dY1 == -dY2 && dX1 == -dX2;
-	}
-
 
 
 
 
 	simulateCircle(r, target) {
-		let isTouching = this.centreAlreadyAtCollisionPoint(r, target);
-		let pointOfCollision = this.getPointOfCollision(r, target);
-		let prevP = [this.node.xPos+r, this.node.yPos+r];
-		if (!isTouching) {
+		this.applyGravitation();
+		let centreX = this.node.xPos+r;
+		let centreY = this.node.yPos+r;
+		let stoppingPoint = this.getPointOfCollision(r, target);
+		let distanceToStoppingPoint = Math.hypot(centreX-stoppingPoint[0], centreY-stoppingPoint[1]);
+		let distanceCoveredByVelocity = Math.hypot(this.velocityX, this.velocityY);
+
+		let atPoint = this.centreAlreadyAtCollisionPoint(r, target);
+		if (atPoint && stoppingPoint) {
+			return;
+		}
+
+		let passing = (Math.round(distanceToStoppingPoint) > Math.round(distanceCoveredByVelocity));
+
+		if (passing || !stoppingPoint) {
 			this.move();
-			let curtP = [this.node.xPos+r, this.node.yPos+r];
-			if (this.passedPointOfCollision(prevP, curtP, pointOfCollision)) {
-				this.node.setX(pointOfCollision[0] - r);
-				this.node.setY(pointOfCollision[1] - r);
-			}	
-		} 
-		//console.log(pointOfCollision);
-		//console.log(isTouching);
+		} else {
+			console.log(stoppingPoint);
+			this.node.setX(stoppingPoint[0]-r);
+			this.node.setY(stoppingPoint[1]-r);
+			this.velocityY = -this.velocityY;
+		}
+
+		// console.log("Centre will stop at: " + stoppingPoint);
+		// console.log("CentreX: " + centreX + " CentreY: " + centreY);
+		//console.log("distanceCoveredByVelocity: " + distanceCoveredByVelocity);
+		console.log("");
 	}
 
 
@@ -917,19 +925,21 @@ function start() {
 	 		//scene.children[1].changeYBy(speed);
 	 	};
 	 	if(moveLeft) {
-	 		//scene.children[0].rotateBy(-0.03);
 	 	}
 	 	if(moveRight) {
-	 		//scene.children[0].rotateBy(0.03);
 	 	};
-	 	if(rotateClockwise) {	 	
-	 		scene.children[1].physicsBody.velocityX = speed;	
+	 	if(rotateClockwise) {	 
+	 		 		scene.children[1].rotateBy(-0.03);
+	
+	 		//scene.children[1].physicsBody.velocityX = speed;	
 	 		//console.log(1);
 	 		//scene.children[1].physicsBody.rotateBy(0.07, 0);
 	 		//scene.children[1].velocityX = 2;
 	 	}
 	 	if(rotateCounterClockwise) {
-	 		scene.children[1].physicsBody.velocityX = -speed;
+	 			 		scene.children[1].rotateBy(0.03);
+
+	 		//scene.children[1].physicsBody.velocityX = -speed;
 	 		//scene.children[1].physicsBody.rotateBy(-0.07, 0);
 	 	}
 	 	if(rotateClockwise2) {
