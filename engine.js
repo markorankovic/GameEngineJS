@@ -1,5 +1,4 @@
 
-
 /* To continue with this project, the following will need to be done:
 
 	1. Go to the Physics class and fix the issue by the comment "Error here"
@@ -585,7 +584,7 @@ class Scene extends SpriteNode {
 
 		var rect3_1 = new SpriteNode(400, 340, 0, 'rect3_1');
 		rect3_1.setShape(new Rect(400, 100, 3, 'green', 'black'));
-		rect3_1.rotateBy(1);
+		//rect3_1.rotateBy(1);
 
 		this.addChild(rect3_1);
 		this.addChild(rect3);
@@ -845,78 +844,34 @@ class PhysicsBody {
 	}
 
 
-	notMoving() {
-		return this.velocityX == 0 && this.velocityY == 0;
+	
+
+	passedPointOfCollision(prevP, curtP, pointOfCollision) {
+		let dY1 = prevP[1] - pointOfCollision[1];
+		let dY2 = curtP[1] - pointOfCollision[1];
+		let dX1 = prevP[0] - pointOfCollision[0];
+		let dX2 = curtP[0] - pointOfCollision[0];
+		return dY1 == -dY2 && dX1 == -dX2;
 	}
 
-
-	getPointsOfCollisionBetweenVelocity(r, target) {
-		this.node.changeXBy(-this.velocityX);
-		this.node.changeYBy(-this.velocityY);
-
-		let currentPointOfCollision = this.getPointOfCollision(r, target);
-
-		this.node.changeXBy(this.velocityX);
-		this.node.changeYBy(this.velocityY);
-
-		let nextPointOfCollision = this.getPointOfCollision(r, target); 
-		return [currentPointOfCollision, nextPointOfCollision];
-	}
-
-
-	currentAndNextPointOfCollisionAreTheSame(r, target) {
-
-		if (this.notMoving()) {
-			return true;
-		}
-
-		let pointsOfCollisionBetweenVelocity = this.getPointsOfCollisionBetweenVelocity(r, target);
-		let currentPointOfCollision = pointsOfCollisionBetweenVelocity[0];
-		let nextPointOfCollision = pointsOfCollisionBetweenVelocity[1];
-
-		if (!currentPointOfCollision) {
-			return true;
-		}
-
-		let xPointsTheSame = Math.round(currentPointOfCollision[0]) == Math.round(nextPointOfCollision[0]);
-		let yPointsTheSame = Math.round(currentPointOfCollision[1]) == Math.round(nextPointOfCollision[1]);
-
-		return xPointsTheSame && yPointsTheSame;
-	}
-
-
-	circleIsHit(r, target) {
-
-		if (!this.currentAndNextPointOfCollisionAreTheSame(r, target)) {
-			return true;
-		}
-		return false;
-
-	}
-
-
-	bounce() {
-		this.velocityX = -this.velocityX;
-		this.velocityY = -this.velocityY;
-	}
-
-	handleCollision(r, target) {
-		let circleIsHit = this.circleIsHit(r, target);
-		if (circleIsHit) {
-			console.log("circleIsHit");
-			this.node.changeXBy(-this.velocityX);
-			this.node.changeYBy(-this.velocityY);
-			this.bounce();
-		}
-	}
 
 
 
 
 	simulateCircle(r, target) {
-		this.applyGravitation();
-		this.move();
-		this.handleCollision(r, target);
+		let isTouching = this.centreAlreadyAtCollisionPoint(r, target);
+		let pointOfCollision = this.getPointOfCollision(r, target);
+		let prevP = [this.node.xPos+r, this.node.yPos+r];
+		if (!isTouching) {
+			this.move();
+			let curtP = [this.node.xPos+r, this.node.yPos+r];
+			if (this.passedPointOfCollision(prevP, curtP, pointOfCollision)) {
+				this.node.setX(pointOfCollision[0] - r);
+				this.node.setY(pointOfCollision[1] - r);
+			}	
+		} 
+		//console.log(pointOfCollision);
+		//console.log(isTouching);
 	}
 
 
@@ -1085,5 +1040,6 @@ function renderNode(parent, ctx) {
 	parent.isRotating = false;
 
 }
+
 
 
